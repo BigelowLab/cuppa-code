@@ -1,0 +1,77 @@
+---
+title: "Broom Baby Broom"
+author: "btupper"
+date: "6/25/2021"
+output: github_document
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Problem
+
+I have a data frame, and I want to make some linear models among different variables (columns).  I really only want a few important bits of information from the models, not the models themselves.  How I can do this programmatically?
+
+## Answer
+
+Make a function that computes the linear model between any two variables (columns) of your choosing, and extracts the statistics you want.  Iterate over the pairs of columns computing the statistics, and then pool the results into a single data frame.  We'll use the built-in `mtcars` dataset (see `?mtcars`), but we'll cast into a handy [tibble](https://tibble.tidyverse.org/).
+
+```{r mtcars, message = FALSE}
+library(dplyr)
+library(broom)
+library(knitr)
+
+mt_cars <- dplyr::as_tibble(mtcars, rownames = "vehicle")
+
+mt_cars
+```
+
+Next we'll make a function that accepts three arguments... the name of the independent variable, `x`, the name of dependent variable, `y`, and the data frame.  Best practice is to document the function using [roxygen](https://cran.r-project.org/web/packages/roxygen2/vignettes/roxygen2.html) style comments.
+
+We use the super-duper [broom](https://cran.r-project.org/web/packages/broom/vignettes/broom.html) package that will sweep all the useful goodies out of a model.  Most models are complex and store statistics and stuff in deeply nested lists.  `broom's` `tidy` and `glance` functions know how to quickly grab the good bits without any fuss.
+
+
+```{r model_function}
+#' Create a linear model with two variables in a data frame. Retrieve just a few of the
+#' model statistics.
+#'
+#' @param x name of the independent variable
+#' @param y name of the dependent variale
+#' @param data the input data frame that must contain columns x and y
+#' @return a single-row tibble with model output and statistics
+model_linear_pairs <- function(x = "disp", y = "mpg", data = mt_cars){
+  f <- as.formula(sprintf("%s ~ %s", y[1], x[1]))
+  m <- lm(f, data = data)
+  t <- broom::tidy(m) 
+  g <- broom::glance(m) %>%
+    dplyr::mutate(model = list(m))
+  r <- dplyr::tibble(
+                     x = x, 
+                     y = y,
+                     intercept = t$estimate[1], 
+                     slope = t$estimate[2]) %>%
+    dplyr::bind_cols(g)
+  return(r)
+}
+```
+
+
+Let's just make a few models - all of which are functionally dependent upon cylinder displacement (`disp`).
+
+
+```{r iterate and bind}
+x <- "disp"
+yy <- c("mpg", "hp", "wt", "qsec")
+
+r <- lapply(yy,
+            function(y, x = "foo", data = NULL){
+              model_linear_pairs(x, y, data)
+            }, x= x, data = mt_cars) %>%
+  dplyr::bind_rows()
+
+r
+```
+
+That's it!

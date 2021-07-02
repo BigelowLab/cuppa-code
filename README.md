@@ -1,2 +1,2 @@
 # cuppa-code
-Cafe-Code's listing of resource, tips and tricks in various languages.
+Cafe-Code's listing of resources, tips and tricks in various languages.
